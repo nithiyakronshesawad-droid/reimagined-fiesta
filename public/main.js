@@ -1,5 +1,13 @@
 ﻿const form = document.getElementById("login-form");
 
+function goByRole(role) {
+  if (role === "admin") {
+    window.location.href = "/admin.html";
+    return;
+  }
+  window.location.href = "/women-fashion.html";
+}
+
 async function checkSession() {
   const res = await fetch("/api/me", { credentials: "include" });
   if (!res.ok) {
@@ -23,19 +31,20 @@ form.addEventListener("submit", async (e) => {
     credentials: "include"
   });
 
-  if (!res.ok) {
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data) {
     alert("ล็อกอินไม่สำเร็จ");
     return;
   }
 
   setTimeout(() => {
-    window.location.href = "/admin.html";
-  }, 400);
+    goByRole(data.role);
+  }, 300);
 });
 
 (async () => {
   const me = await checkSession();
-  if (me && me.role === "admin") {
-    window.location.href = "/admin.html";
+  if (me) {
+    goByRole(me.role);
   }
 })();
