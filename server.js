@@ -4,7 +4,6 @@ const crypto = require("crypto");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const sqlite3 = require("sqlite3").verbose();
 const bcrypt = require("bcryptjs");
 const rateLimit = require("express-rate-limit");
 
@@ -14,52 +13,35 @@ const COOKIE_NAME = "session_id";
 const SESSION_SECRET = process.env.SESSION_SECRET || "change-this-in-production";
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123";
-const defaultDbDir = process.platform === "win32"
-  ? path.join(os.tmpdir(), "login-system")
-  : "/tmp/login-system";
+const defaultDbDir = process.platform === "win32" ? path.join(os.tmpdir(), "login-system") : "/tmp/login-system";
 const DB_DIR = process.env.DB_DIR || defaultDbDir;
-fs.mkdirSync(DB_DIR, { recursive: true });
-const DB_PATH = path.join(DB_DIR, "data.sqlite");
-const db = new sqlite3.Database(DB_PATH);
+const DB_PATH = path.join(DB_DIR, "data.json");
 
-function run(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function onRun(err) {
-      if (err) return reject(err);
-      return resolve(this);
-    });
-  });
+function ensureDbFile() {
+  fs.mkdirSync(DB_DIR, { recursive: true });
+  if (!fs.existsSync(DB_PATH)) {
+    const initialData = { users: [], sessions: [] };
+    fs.writeFileSync(DB_PATH, JSON.stringify(initialData, null, 2), "utf8");
+  }
 }
 
-function get(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => {
-      if (err) return reject(err);
-      return resolve(row);
-    });
-  });
+function loadDb() {
+  const raw = fs.readFileSync(DB_PATH, "utf8");
+  return JSON.parse(raw);
+}
+
+function saveDb(data) {
+  fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), "utf8");
 }
 
 async function initDb() {
-  await run(`
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT NOT NULL UNIQUE,
-      password_hash TEXT NOT NULL
-    )
-  `);
-  await run(`
-    CREATE TABLE IF NOT EXISTS sessions (
-      token TEXT PRIMARY KEY,
-      username TEXT NOT NULL,
-      expires_at INTEGER NOT NULL
-    )
-  `);
-
-  const existingAdmin = await get("SELECT username FROM users WHERE username = ?", [ADMIN_USERNAME]);
+  ensureDbFile();
+  const data = loadDb();
+  const existingAdmin = data.users.find((u) => u.username === ADMIN_USERNAME);
   if (!existingAdmin) {
     const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 10);
-    await run("INSERT INTO users (username, password_hash) VALUES (?, ?)", [ADMIN_USERNAME, passwordHash]);
+    data.users.push({ username: ADMIN_USERNAME, passwordHash });
+    saveDb(data);
   }
 }
 
@@ -80,22 +62,28 @@ function sign(value) {
   return crypto.createHmac("sha256", SESSION_SECRET).update(value).digest("hex");
 }
 
-async function createSession(username) {
+function createSession(username) {
   const token = crypto.randomBytes(24).toString("hex");
   const value = `${token}.${sign(token)}`;
   const expiresAt = Date.now() + 1000 * 60 * 60 * 24;
-  await run("INSERT INTO sessions (token, username, expires_at) VALUES (?, ?, ?)", [token, username, expiresAt]);
+  const data = loadDb();
+  data.sessions = data.sessions.filter((s) => s.expiresAt > Date.now());
+  data.sessions.push({ token, username, expiresAt });
+  saveDb(data);
   return value;
 }
 
-async function getUserFromCookie(rawCookie) {
+function getUserFromCookie(rawCookie) {
   if (!rawCookie || !rawCookie.includes(".")) return null;
   const [token, sig] = rawCookie.split(".");
   if (sign(token) !== sig) return null;
-  const session = await get("SELECT username, expires_at FROM sessions WHERE token = ?", [token]);
+
+  const data = loadDb();
+  const session = data.sessions.find((s) => s.token === token);
   if (!session) return null;
-  if (session.expires_at < Date.now()) {
-    await run("DELETE FROM sessions WHERE token = ?", [token]);
+  if (session.expiresAt < Date.now()) {
+    data.sessions = data.sessions.filter((s) => s.token !== token);
+    saveDb(data);
     return null;
   }
   return session.username;
@@ -111,17 +99,18 @@ app.post("/api/login", loginLimiter, async (req, res) => {
     return res.status(400).json({ error: "Missing username or password" });
   }
 
-  const user = await get("SELECT username, password_hash FROM users WHERE username = ?", [username]);
+  const data = loadDb();
+  const user = data.users.find((u) => u.username === username);
   if (!user) {
     return res.status(401).json({ error: "Invalid credentials" });
   }
 
-  const ok = await bcrypt.compare(password, user.password_hash);
+  const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) {
     return res.status(401).json({ error: "Invalid credentials" });
   }
 
-  const sessionValue = await createSession(username);
+  const sessionValue = createSession(username);
   res.cookie(COOKIE_NAME, sessionValue, {
     httpOnly: true,
     sameSite: "lax",
@@ -132,18 +121,20 @@ app.post("/api/login", loginLimiter, async (req, res) => {
   return res.json({ ok: true, username });
 });
 
-app.post("/api/logout", async (req, res) => {
+app.post("/api/logout", (req, res) => {
   const rawCookie = req.cookies[COOKIE_NAME];
   if (rawCookie && rawCookie.includes(".")) {
     const [token] = rawCookie.split(".");
-    await run("DELETE FROM sessions WHERE token = ?", [token]);
+    const data = loadDb();
+    data.sessions = data.sessions.filter((s) => s.token !== token);
+    saveDb(data);
   }
   res.clearCookie(COOKIE_NAME);
   res.json({ ok: true });
 });
 
-app.get("/api/me", async (req, res) => {
-  const username = await getUserFromCookie(req.cookies[COOKIE_NAME]);
+app.get("/api/me", (req, res) => {
+  const username = getUserFromCookie(req.cookies[COOKIE_NAME]);
   if (!username) {
     return res.status(401).json({ error: "Not authenticated" });
   }
