@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login System</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>Login System</h1>
+      <p class="subtitle">ทดสอบระบบล็อกอินก่อนนำขึ้นใช้งานจริง</p>
+
+      <form id="login-form" class="card">
+        <label for="username">Username</label>
+        <input id="username" name="username" placeholder="admin" required />
+
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" placeholder="admin123" required />
+
+        <button type="submit">Login</button>
+      </form>
+
+      <section class="card">
+        <h2>Session Status</h2>
+        <p id="status">Checking...</p>
+        <div class="actions">
+          <button id="check-btn" type="button">Check Session</button>
+          <button id="logout-btn" type="button">Logout</button>
+        </div>
+      </section>
+    </main>
+
+    <script src="./main.js"></script>
+  </body>
+  </html>
