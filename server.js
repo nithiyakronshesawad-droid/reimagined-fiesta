@@ -1,4 +1,4 @@
-const express = require("express");
+﻿const express = require("express");
 const cookieParser = require("cookie-parser");
 const crypto = require("crypto");
 const fs = require("fs");
@@ -20,29 +20,64 @@ const DB_PATH = path.join(DB_DIR, "data.json");
 function ensureDbFile() {
   fs.mkdirSync(DB_DIR, { recursive: true });
   if (!fs.existsSync(DB_PATH)) {
-    const initialData = { users: [], sessions: [] };
+    const initialData = { users: [], sessions: [], customers: [] };
     fs.writeFileSync(DB_PATH, JSON.stringify(initialData, null, 2), "utf8");
   }
 }
 
 function loadDb() {
   const raw = fs.readFileSync(DB_PATH, "utf8");
-  return JSON.parse(raw);
+  const data = JSON.parse(raw);
+  if (!Array.isArray(data.users)) data.users = [];
+  if (!Array.isArray(data.sessions)) data.sessions = [];
+  if (!Array.isArray(data.customers)) data.customers = [];
+  return data;
 }
 
 function saveDb(data) {
   fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), "utf8");
 }
 
+function newCustomerId() {
+  return crypto.randomBytes(8).toString("hex");
+}
+
 async function initDb() {
   ensureDbFile();
   const data = loadDb();
+
   const existingAdmin = data.users.find((u) => u.username === ADMIN_USERNAME);
   if (!existingAdmin) {
     const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 10);
-    data.users.push({ username: ADMIN_USERNAME, passwordHash });
-    saveDb(data);
+    data.users.push({ username: ADMIN_USERNAME, passwordHash, role: "admin" });
+  } else if (!existingAdmin.role) {
+    existingAdmin.role = "admin";
   }
+
+  if (data.customers.length === 0) {
+    data.customers.push(
+      {
+        id: newCustomerId(),
+        name: "Somchai Prasert",
+        email: "somchai@example.com",
+        phone: "0812345678",
+        status: "active",
+        notes: "VIP customer",
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: newCustomerId(),
+        name: "Nina Techakul",
+        email: "nina@example.com",
+        phone: "0899988877",
+        status: "pending",
+        notes: "Waiting for profile completion",
+        updatedAt: new Date().toISOString()
+      }
+    );
+  }
+
+  saveDb(data);
 }
 
 app.use(express.json());
@@ -73,7 +108,7 @@ function createSession(username) {
   return value;
 }
 
-function getUserFromCookie(rawCookie) {
+function getSessionUser(rawCookie) {
   if (!rawCookie || !rawCookie.includes(".")) return null;
   const [token, sig] = rawCookie.split(".");
   if (sign(token) !== sig) return null;
@@ -81,12 +116,29 @@ function getUserFromCookie(rawCookie) {
   const data = loadDb();
   const session = data.sessions.find((s) => s.token === token);
   if (!session) return null;
+
   if (session.expiresAt < Date.now()) {
     data.sessions = data.sessions.filter((s) => s.token !== token);
     saveDb(data);
     return null;
   }
-  return session.username;
+
+  const user = data.users.find((u) => u.username === session.username);
+  if (!user) return null;
+
+  return { username: user.username, role: user.role || "admin", token };
+}
+
+function requireAdmin(req, res, next) {
+  const sessionUser = getSessionUser(req.cookies[COOKIE_NAME]);
+  if (!sessionUser) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+  if (sessionUser.role !== "admin") {
+    return res.status(403).json({ error: "Admin only" });
+  }
+  req.sessionUser = sessionUser;
+  return next();
 }
 
 app.get("/api/health", (req, res) => {
@@ -118,7 +170,7 @@ app.post("/api/login", loginLimiter, async (req, res) => {
     maxAge: 1000 * 60 * 60 * 24
   });
 
-  return res.json({ ok: true, username });
+  return res.json({ ok: true, username, role: user.role || "admin" });
 });
 
 app.post("/api/logout", (req, res) => {
@@ -134,11 +186,74 @@ app.post("/api/logout", (req, res) => {
 });
 
 app.get("/api/me", (req, res) => {
-  const username = getUserFromCookie(req.cookies[COOKIE_NAME]);
-  if (!username) {
+  const sessionUser = getSessionUser(req.cookies[COOKIE_NAME]);
+  if (!sessionUser) {
     return res.status(401).json({ error: "Not authenticated" });
   }
-  return res.json({ username });
+  return res.json({ username: sessionUser.username, role: sessionUser.role });
+});
+
+app.get("/api/admin/customers", requireAdmin, (req, res) => {
+  const data = loadDb();
+  return res.json({ customers: data.customers });
+});
+
+app.post("/api/admin/customers", requireAdmin, (req, res) => {
+  const { name, email = "", phone = "", status = "active", notes = "" } = req.body;
+  if (!name || String(name).trim().length < 2) {
+    return res.status(400).json({ error: "Name is required" });
+  }
+
+  const customer = {
+    id: newCustomerId(),
+    name: String(name).trim(),
+    email: String(email).trim(),
+    phone: String(phone).trim(),
+    status: String(status).trim() || "active",
+    notes: String(notes).trim(),
+    updatedAt: new Date().toISOString()
+  };
+
+  const data = loadDb();
+  data.customers.unshift(customer);
+  saveDb(data);
+  return res.status(201).json({ ok: true, customer });
+});
+
+app.put("/api/admin/customers/:id", requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const data = loadDb();
+  const customer = data.customers.find((c) => c.id === id);
+  if (!customer) {
+    return res.status(404).json({ error: "Customer not found" });
+  }
+
+  const { name, email, phone, status, notes } = req.body;
+  if (name !== undefined) customer.name = String(name).trim();
+  if (email !== undefined) customer.email = String(email).trim();
+  if (phone !== undefined) customer.phone = String(phone).trim();
+  if (status !== undefined) customer.status = String(status).trim() || "active";
+  if (notes !== undefined) customer.notes = String(notes).trim();
+
+  if (!customer.name || customer.name.length < 2) {
+    return res.status(400).json({ error: "Name is required" });
+  }
+
+  customer.updatedAt = new Date().toISOString();
+  saveDb(data);
+  return res.json({ ok: true, customer });
+});
+
+app.delete("/api/admin/customers/:id", requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const data = loadDb();
+  const before = data.customers.length;
+  data.customers = data.customers.filter((c) => c.id !== id);
+  if (data.customers.length === before) {
+    return res.status(404).json({ error: "Customer not found" });
+  }
+  saveDb(data);
+  return res.json({ ok: true });
 });
 
 initDb()

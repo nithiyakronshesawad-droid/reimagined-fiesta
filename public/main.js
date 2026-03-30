@@ -9,8 +9,9 @@ async function checkSession() {
     statusEl.textContent = "ยังไม่ได้ล็อกอิน";
     return null;
   }
+
   const data = await res.json();
-  statusEl.textContent = `ล็อกอินแล้ว: ${data.username}`;
+  statusEl.textContent = `ล็อกอินแล้ว: ${data.username} (${data.role})`;
   return data;
 }
 
@@ -34,10 +35,10 @@ form.addEventListener("submit", async (e) => {
     return;
   }
 
-  statusEl.textContent = "ล็อกอินสำเร็จ กำลังพาไปหน้าลูกค้า...";
+  statusEl.textContent = "ล็อกอินสำเร็จ กำลังพาไปหลังบ้าน...";
   setTimeout(() => {
-    window.location.href = "/customer.html";
-  }, 500);
+    window.location.href = "/admin.html";
+  }, 400);
 });
 
 checkBtn.addEventListener("click", checkSession);
@@ -49,7 +50,7 @@ logoutBtn.addEventListener("click", async () => {
 
 (async () => {
   const me = await checkSession();
-  if (me) {
-    window.location.href = "/customer.html";
+  if (me && me.role === "admin") {
+    window.location.href = "/admin.html";
   }
 })();
