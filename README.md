@@ -1,6 +1,6 @@
 # Login System (Starter)
 
-เว็บตัวอย่างล็อกอินด้วย Express พร้อมโครง deploy ใช้งานจริง
+เว็บตัวอย่างล็อกอินด้วย Express พร้อมโครง deploy ใช้งานจริง (SQLite + bcrypt + rate limit)
 
 ## Run Local
 
@@ -11,17 +11,18 @@ npm start
 
 เปิดที่ `http://localhost:3000`
 
-บัญชีทดสอบ:
+บัญชีเริ่มต้น:
 - username: `admin`
-- password: `admin123`
+- password: `admin123` (ควรเปลี่ยนทันทีผ่าน ENV)
 
 ## Production Checklist
 
 1. ตั้งค่า `SESSION_SECRET` เป็นค่ายาวและปลอดภัย
-2. ตั้ง `NODE_ENV=production`
-3. ต่อฐานข้อมูลจริงแทน in-memory store
-4. เปิด HTTPS (โฮสต์ส่วนใหญ่มีให้)
-5. เพิ่ม rate limit และระบบ log
+2. ตั้ง `ADMIN_PASSWORD` เป็นค่าที่เดายาก
+3. ตั้ง `NODE_ENV=production`
+4. ตั้ง `DB_DIR` ให้เป็นโฟลเดอร์ที่เขียนได้
+5. เปิด HTTPS (โฮสต์ส่วนใหญ่มีให้)
+6. ใน Render Free ดิสก์ไม่ถาวร หากต้องการข้อมูลผู้ใช้คงอยู่ให้เพิ่ม persistent disk
 
 ## Deploy on Render
 

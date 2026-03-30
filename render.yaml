@@ -9,5 +9,9 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: DB_DIR
+        value: /tmp/login-system
       - key: SESSION_SECRET
+        generateValue: true
+      - key: ADMIN_PASSWORD
         generateValue: true
