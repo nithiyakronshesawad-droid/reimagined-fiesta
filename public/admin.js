@@ -1,7 +1,10 @@
 ﻿const rowsEl = document.getElementById("rows");
 const msgEl = document.getElementById("msg");
+const usersRowsEl = document.getElementById("users-rows");
+const usersMsgEl = document.getElementById("users-msg");
 const form = document.getElementById("create-form");
 const refreshBtn = document.getElementById("refresh-btn");
+const refreshUsersBtn = document.getElementById("refresh-users-btn");
 const logoutBtn = document.getElementById("logout-btn");
 
 function esc(v = "") {
@@ -49,6 +52,37 @@ async function fetchCustomers() {
           <button class="save-btn" type="button">Save</button>
           <button class="danger delete-btn" type="button">Delete</button>
         </td>
+      </tr>`
+    )
+    .join("");
+}
+
+async function fetchUsers() {
+  const res = await fetch("/api/admin/users", { credentials: "include" });
+  if (!res.ok) {
+    usersMsgEl.textContent = "โหลดรายชื่อสมาชิกไม่สำเร็จ";
+    usersRowsEl.innerHTML = "";
+    return;
+  }
+
+  const data = await res.json();
+  const users = data.users || [];
+
+  usersMsgEl.textContent = `${users.length} รายการ`;
+  if (users.length === 0) {
+    usersRowsEl.innerHTML = "<tr><td colspan='5'>ยังไม่มีสมาชิกสมัครใหม่</td></tr>";
+    return;
+  }
+
+  usersRowsEl.innerHTML = users
+    .map(
+      (u) => `
+      <tr>
+        <td>${esc(u.fullName)}</td>
+        <td>${esc(u.username)}</td>
+        <td>${esc(u.email)}</td>
+        <td>${esc(u.phone)}</td>
+        <td>${esc((u.createdAt || "").replace("T", " ").slice(0, 16))}</td>
       </tr>`
     )
     .join("");
@@ -126,6 +160,7 @@ rowsEl.addEventListener("click", async (e) => {
 });
 
 refreshBtn.addEventListener("click", fetchCustomers);
+refreshUsersBtn.addEventListener("click", fetchUsers);
 
 logoutBtn.addEventListener("click", async () => {
   await fetch("/api/logout", { method: "POST", credentials: "include" });
@@ -139,4 +174,5 @@ logoutBtn.addEventListener("click", async () => {
     return;
   }
   await fetchCustomers();
+  await fetchUsers();
 })();

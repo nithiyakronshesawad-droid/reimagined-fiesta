@@ -50,6 +50,28 @@
           </table>
         </div>
       </section>
+
+      <section class="card">
+        <div class="topbar small-gap">
+          <h2>รายชื่อสมาชิกที่สมัคร</h2>
+          <button id="refresh-users-btn" type="button">Refresh</button>
+        </div>
+        <p id="users-msg" class="subtitle">กำลังโหลด...</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Full Name</th>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody id="users-rows"></tbody>
+          </table>
+        </div>
+      </section>
     </main>
 
     <script src="./admin.js"></script>

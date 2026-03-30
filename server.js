@@ -42,6 +42,10 @@ function newCustomerId() {
   return crypto.randomBytes(8).toString("hex");
 }
 
+function newUserId() {
+  return crypto.randomBytes(8).toString("hex");
+}
+
 async function initDb() {
   ensureDbFile();
   const data = loadDb();
@@ -49,9 +53,20 @@ async function initDb() {
   const existingAdmin = data.users.find((u) => u.username === ADMIN_USERNAME);
   if (!existingAdmin) {
     const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 10);
-    data.users.push({ username: ADMIN_USERNAME, passwordHash, role: "admin" });
+    data.users.push({
+      id: newUserId(),
+      fullName: "System Admin",
+      email: "",
+      phone: "",
+      username: ADMIN_USERNAME,
+      passwordHash,
+      role: "admin",
+      createdAt: new Date().toISOString()
+    });
   } else if (!existingAdmin.role) {
     existingAdmin.role = "admin";
+    if (!existingAdmin.id) existingAdmin.id = newUserId();
+    if (!existingAdmin.createdAt) existingAdmin.createdAt = new Date().toISOString();
   }
 
   if (data.customers.length === 0) {
@@ -173,6 +188,61 @@ app.post("/api/login", loginLimiter, async (req, res) => {
   return res.json({ ok: true, username, role: user.role || "admin" });
 });
 
+app.post("/api/register", async (req, res) => {
+  const {
+    fullName = "",
+    email = "",
+    phone = "",
+    username = "",
+    password = "",
+    confirmPassword = ""
+  } = req.body;
+
+  if (String(fullName).trim().length < 2) {
+    return res.status(400).json({ error: "กรุณากรอกชื่อให้ถูกต้อง" });
+  }
+  if (String(username).trim().length < 3) {
+    return res.status(400).json({ error: "ชื่อผู้ใช้ต้องมีอย่างน้อย 3 ตัวอักษร" });
+  }
+  if (String(password).length < 6) {
+    return res.status(400).json({ error: "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร" });
+  }
+  if (password !== confirmPassword) {
+    return res.status(400).json({ error: "รหัสผ่านไม่ตรงกัน" });
+  }
+
+  const data = loadDb();
+  const usernameTaken = data.users.some((u) => u.username.toLowerCase() === String(username).trim().toLowerCase());
+  if (usernameTaken) {
+    return res.status(409).json({ error: "ชื่อผู้ใช้นี้ถูกใช้แล้ว" });
+  }
+
+  if (email) {
+    const emailTaken = data.users.some(
+      (u) => u.email && u.email.toLowerCase() === String(email).trim().toLowerCase()
+    );
+    if (emailTaken) {
+      return res.status(409).json({ error: "อีเมลนี้ถูกใช้แล้ว" });
+    }
+  }
+
+  const passwordHash = await bcrypt.hash(password, 10);
+  const newUser = {
+    id: newUserId(),
+    fullName: String(fullName).trim(),
+    email: String(email).trim(),
+    phone: String(phone).trim(),
+    username: String(username).trim(),
+    passwordHash,
+    role: "customer",
+    createdAt: new Date().toISOString()
+  };
+
+  data.users.push(newUser);
+  saveDb(data);
+  return res.status(201).json({ ok: true });
+});
+
 app.post("/api/logout", (req, res) => {
   const rawCookie = req.cookies[COOKIE_NAME];
   if (rawCookie && rawCookie.includes(".")) {
@@ -196,6 +266,22 @@ app.get("/api/me", (req, res) => {
 app.get("/api/admin/customers", requireAdmin, (req, res) => {
   const data = loadDb();
   return res.json({ customers: data.customers });
+});
+
+app.get("/api/admin/users", requireAdmin, (req, res) => {
+  const data = loadDb();
+  const users = data.users
+    .filter((u) => (u.role || "customer") !== "admin")
+    .map((u) => ({
+      id: u.id || "",
+      fullName: u.fullName || "",
+      email: u.email || "",
+      phone: u.phone || "",
+      username: u.username || "",
+      role: u.role || "customer",
+      createdAt: u.createdAt || ""
+    }));
+  return res.json({ users });
 });
 
 app.post("/api/admin/customers", requireAdmin, (req, res) => {

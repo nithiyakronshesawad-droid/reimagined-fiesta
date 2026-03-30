@@ -1,0 +1,64 @@
+﻿<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>สมัครสมาชิก | Velvet Muse</title>
+    <link rel="stylesheet" href="./login.css" />
+  </head>
+  <body>
+    <main class="login-shell">
+      <section class="login-card">
+        <header class="login-head">
+          <h1>สมัครสมาชิก</h1>
+          <div class="qr-pill">Member</div>
+        </header>
+
+        <form class="login-form" id="register-form">
+          <input name="fullName" placeholder="ชื่อ - นามสกุล" required />
+          <input name="email" type="email" placeholder="อีเมล" required />
+          <input name="phone" placeholder="เบอร์โทร" />
+          <input name="username" placeholder="ชื่อผู้ใช้" required />
+          <input name="password" type="password" placeholder="รหัสผ่าน" required />
+          <input name="confirmPassword" type="password" placeholder="ยืนยันรหัสผ่าน" required />
+          <button type="submit" class="login-btn">สมัครสมาชิก</button>
+        </form>
+
+        <p id="msg" class="terms">กรอกข้อมูลให้ครบ แล้วกดสมัครสมาชิก</p>
+        <p class="register">มีบัญชีอยู่แล้ว? <a href="/">เข้าสู่ระบบ</a></p>
+      </section>
+    </main>
+
+    <script>
+      const form = document.getElementById("register-form");
+      const msg = document.getElementById("msg");
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const payload = {
+          fullName: form.fullName.value,
+          email: form.email.value,
+          phone: form.phone.value,
+          username: form.username.value,
+          password: form.password.value,
+          confirmPassword: form.confirmPassword.value
+        };
+
+        const res = await fetch("/api/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          msg.textContent = data.error || "สมัครสมาชิกไม่สำเร็จ";
+          return;
+        }
+
+        alert("สมัครสมาชิกสำเร็จ");
+        window.location.href = "/";
+      });
+    </script>
+  </body>
+</html>
