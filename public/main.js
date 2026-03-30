@@ -1,16 +1,17 @@
-const statusEl = document.getElementById("status");
+﻿const statusEl = document.getElementById("status");
 const form = document.getElementById("login-form");
 const checkBtn = document.getElementById("check-btn");
 const logoutBtn = document.getElementById("logout-btn");
 
 async function checkSession() {
-  const res = await fetch("/api/me");
+  const res = await fetch("/api/me", { credentials: "include" });
   if (!res.ok) {
     statusEl.textContent = "ยังไม่ได้ล็อกอิน";
-    return;
+    return null;
   }
   const data = await res.json();
   statusEl.textContent = `ล็อกอินแล้ว: ${data.username}`;
+  return data;
 }
 
 form.addEventListener("submit", async (e) => {
@@ -24,7 +25,8 @@ form.addEventListener("submit", async (e) => {
   const res = await fetch("/api/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    credentials: "include"
   });
 
   if (!res.ok) {
@@ -32,14 +34,22 @@ form.addEventListener("submit", async (e) => {
     return;
   }
 
-  await checkSession();
+  statusEl.textContent = "ล็อกอินสำเร็จ กำลังพาไปหน้าลูกค้า...";
+  setTimeout(() => {
+    window.location.href = "/customer.html";
+  }, 500);
 });
 
 checkBtn.addEventListener("click", checkSession);
 
 logoutBtn.addEventListener("click", async () => {
-  await fetch("/api/logout", { method: "POST" });
+  await fetch("/api/logout", { method: "POST", credentials: "include" });
   await checkSession();
 });
 
-checkSession();
+(async () => {
+  const me = await checkSession();
+  if (me) {
+    window.location.href = "/customer.html";
+  }
+})();
