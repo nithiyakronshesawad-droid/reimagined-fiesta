@@ -3,31 +3,34 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Admin Login</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <title>Velvet Muse Admin Login</title>
+    <link rel="stylesheet" href="./login.css" />
   </head>
   <body>
-    <main class="container">
-      <h1>Admin Login</h1>
-      <p class="subtitle">เข้าสู่ระบบหลังบ้านเพื่อจัดการข้อมูลลูกค้า</p>
+    <main class="login-shell">
+      <section class="login-card">
+        <header class="login-head">
+          <h1>เข้าสู่ระบบ</h1>
+          <div class="qr-pill">เข้าใช้งานด้วย QR</div>
+        </header>
 
-      <form id="login-form" class="card">
-        <label for="username">Username</label>
-        <input id="username" name="username" placeholder="admin" required />
+        <form id="login-form" class="login-form">
+          <input id="username" name="username" placeholder="อีเมล / ชื่อผู้ใช้" required />
+          <input id="password" name="password" type="password" placeholder="รหัสผ่าน" required />
+          <button type="submit" class="login-btn">เข้าสู่ระบบ</button>
+        </form>
 
-        <label for="password">Password</label>
-        <input id="password" name="password" type="password" placeholder="••••••••" required />
+        <a class="forgot" href="#">ลืมรหัสผ่าน</a>
 
-        <button type="submit">Login</button>
-      </form>
+        <div class="divider"><span>หรือ</span></div>
 
-      <section class="card">
-        <h2>สถานะ</h2>
-        <p id="status">Checking...</p>
-        <div class="actions">
-          <button id="check-btn" type="button">Check</button>
-          <button id="logout-btn" type="button">Logout</button>
+        <div class="social-row">
+          <button class="social" type="button">Facebook</button>
+          <button class="social" type="button">Google</button>
         </div>
+
+        <p class="terms">เมื่อเข้าสู่ระบบ แปลว่ายอมรับข้อตกลงการใช้งานและนโยบายความเป็นส่วนตัว</p>
+        <p class="register">ยังไม่มีบัญชี? <a href="/women-fashion.html">ดูหน้าเว็บสินค้า</a></p>
       </section>
     </main>
 

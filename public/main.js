@@ -1,18 +1,11 @@
-﻿const statusEl = document.getElementById("status");
-const form = document.getElementById("login-form");
-const checkBtn = document.getElementById("check-btn");
-const logoutBtn = document.getElementById("logout-btn");
+﻿const form = document.getElementById("login-form");
 
 async function checkSession() {
   const res = await fetch("/api/me", { credentials: "include" });
   if (!res.ok) {
-    statusEl.textContent = "ยังไม่ได้ล็อกอิน";
     return null;
   }
-
-  const data = await res.json();
-  statusEl.textContent = `ล็อกอินแล้ว: ${data.username} (${data.role})`;
-  return data;
+  return res.json();
 }
 
 form.addEventListener("submit", async (e) => {
@@ -31,21 +24,13 @@ form.addEventListener("submit", async (e) => {
   });
 
   if (!res.ok) {
-    statusEl.textContent = "ล็อกอินไม่สำเร็จ";
+    alert("ล็อกอินไม่สำเร็จ");
     return;
   }
 
-  statusEl.textContent = "ล็อกอินสำเร็จ กำลังพาไปหลังบ้าน...";
   setTimeout(() => {
     window.location.href = "/admin.html";
   }, 400);
-});
-
-checkBtn.addEventListener("click", checkSession);
-
-logoutBtn.addEventListener("click", async () => {
-  await fetch("/api/logout", { method: "POST", credentials: "include" });
-  await checkSession();
 });
 
 (async () => {
