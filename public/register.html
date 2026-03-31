@@ -32,27 +32,78 @@
     <script>
       const form = document.getElementById("register-form");
       const msg = document.getElementById("msg");
+      const STORAGE_USERS = "vm_users";
+
+      function seedUsers() {
+        const raw = localStorage.getItem(STORAGE_USERS);
+        if (raw) return;
+        localStorage.setItem(
+          STORAGE_USERS,
+          JSON.stringify([{ username: "admin", password: "admin123", role: "admin", fullName: "System Admin" }])
+        );
+      }
+
+      function staticRegister(payload) {
+        seedUsers();
+        const users = JSON.parse(localStorage.getItem(STORAGE_USERS) || "[]");
+        const usernameTaken = users.some((u) => u.username.toLowerCase() === payload.username.toLowerCase());
+        if (usernameTaken) return { ok: false, error: "ชื่อผู้ใช้นี้ถูกใช้แล้ว" };
+
+        const emailTaken = users.some((u) => (u.email || "").toLowerCase() === payload.email.toLowerCase());
+        if (emailTaken) return { ok: false, error: "อีเมลนี้ถูกใช้แล้ว" };
+
+        users.push({
+          fullName: payload.fullName,
+          email: payload.email,
+          phone: payload.phone,
+          username: payload.username,
+          password: payload.password,
+          role: "customer"
+        });
+        localStorage.setItem(STORAGE_USERS, JSON.stringify(users));
+        return { ok: true };
+      }
 
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
         const payload = {
-          fullName: form.fullName.value,
-          email: form.email.value,
-          phone: form.phone.value,
-          username: form.username.value,
+          fullName: form.fullName.value.trim(),
+          email: form.email.value.trim(),
+          phone: form.phone.value.trim(),
+          username: form.username.value.trim(),
           password: form.password.value,
           confirmPassword: form.confirmPassword.value
         };
 
-        const res = await fetch("/api/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
+        if (payload.password.length < 6) {
+          msg.textContent = "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร";
+          return;
+        }
+        if (payload.password !== payload.confirmPassword) {
+          msg.textContent = "รหัสผ่านไม่ตรงกัน";
+          return;
+        }
 
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          msg.textContent = data.error || "สมัครสมาชิกไม่สำเร็จ";
+        let ok = false;
+        let error = "สมัครสมาชิกไม่สำเร็จ";
+
+        try {
+          const res = await fetch("/api/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json().catch(() => ({}));
+          ok = res.ok;
+          error = data.error || error;
+        } catch (e) {
+          const result = staticRegister(payload);
+          ok = result.ok;
+          error = result.error || error;
+        }
+
+        if (!ok) {
+          msg.textContent = error;
           return;
         }
 
